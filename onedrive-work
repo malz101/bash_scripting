@@ -1,0 +1,35 @@
+#!/bin/bash
+
+# wrapper script for onedrive command where confdir=~/.config/onedrive-work/config
+onedrive_type="onedrive-work"
+confdir="~/.config/onedrive/$onedrive_type"
+############################################################
+# Help                                                     #
+############################################################
+Help(){
+    echo "Wrapper script for 'onedrive' where 'confdir=$confdir'."
+    echo "$onedrive_type has same syntax and options as the 'onedrive' command."
+    echo
+    #This will 
+    onedrive --help | sed "s/onedrive \[options\]/$onedrive_type [options]/" # replace the first occurrence of 'onedrive [options]' on each line of input with 'onedrive-personal'. Add a /g flag to replace all occurrences
+}
+
+
+############################################################
+############################################################
+# Main program                                             #
+############################################################
+############################################################
+############################################################
+# Process the input options. Add options as needed.        #
+############################################################
+# Get the options
+case $1 in
+    -h | --help) # display custom Help function
+        Help
+        exit 0;;
+    *) #execute onedrive command with all argumets passed 
+        #echo $*
+        onedrive --confdir=$confdir $* #| sed "s/onedrive \[options\]/$onedrive_type [options]/"
+        exit 0;;
+esac
