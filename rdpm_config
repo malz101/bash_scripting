@@ -1,0 +1,172 @@
+#!/bin/bash
+############################################################
+# Help                                                     #
+############################################################
+help=$(cat << EOM
+Runtime Dynamic Power Management information for NVIDIA Optimus laptops.
+    
+Usage: 
+    rdpm_config {-f | --device_function} {vga | audio} [OPTION]...  intel | nvidia
+        -a, --all                        displays all information for the PCI function
+        -c, --control                    displays the status of the Dynamic Power Management for the PCI function
+        -D, --pci_dev_sys_interface_dir  displays the sys interface directory that contains the files for that contain the information of runtime Dynamic Power Management for the PCI function
+        -e, --runtime_enabled            displays status of the runtime Dynamic Power Management (enabled or disabled) for the PCI function
+        -f, --device_function            specify which gpu PCI function is being queried (vga or audio)
+        -s, --runtime_status             displays the current status (active or suspended) of the PCI function
+        -t, --suspended_time             displays the cumulative length of time that the PCI function has been suspended since last boot (hh:mm:ss)
+        -T, --active_time                displays the cumulative length of time that the PCI function has been active since last boot (hh:mm:ss)
+        -u, --runtime_usage              displays the current runtime power usage of the PCI function
+
+    rdpm_config -h | --help              display this help and exit
+
+Examples:
+    rdpm_config -f vga -s nvidia  Output the cumulative length of time the VGA controller PCI function of the nvidia gpu has been suspended since last boot.
+    rdpm_config -f audio -se intel Output the cumulative length of time Audio device PCI function of intel integrated gpu has been suspended since last boot and status of Dynamic Power Management.
+
+Additional Help:
+    RedHat Runtime Device Power Management: <https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/7/html/power_management_guide/runtime_device_power_management>
+    NVIDIA PCI-Express Runtime D3 (RTD3) Power Management: <https://download.nvidia.com/XFree86/Linux-x86_64/515.65.01/README/dynamicpowermanagement.html>
+    Full documentation: <https://www.kernel.org/doc/html/latest/power/runtime_pm.html>
+EOM
+)
+# -d, --autosuspend_delay_ms       displays the minimum time period of inactivity between idle state and suspending for the PCI function
+
+invalid_command_handler(){
+    echo -e "rdpm_config: invalid command.\nTry 'rdpm_config --help' for more information."
+    #echo "$help"       #quotation is needed, otherwise it removes all of the trailing newlines
+    exit 1
+}
+
+##########################################################
+#Variable Definitions                                    #
+##########################################################
+#/sys/bus/pci/devices/<Domain>:<Bus>:<Device>.<Function>/
+#the bus,device and function for device can be gathered from the lspci linux command. PCI devices are also given domain numbers, but they are usually omitted by lspci since very often all devices have the same domain number (usually zero)
+sys_interface_dir="/sys/bus/pci/devices" #sys interface directory that contains the files for that contain the information of all PCI devices connected to computer
+rdpm_dir="power"
+nvidia_vga_controller_pci_device="0000:01:00.0"     #PCI <domain>:<bus number>:<device number>.function_number of NVIDIA VGA Controller function
+nvidia_audio_device_pci_device="0000:01:00.2"       #PCI <domain>:<bus number>:<device number>.function_number of NVIDIA Audio device function
+intel_vga_controller_pci_device="0000:00:02.0"      #PCI <domain>:<bus number>:<device number>.function_number of Intel VGA Controller function
+intel_audio_device_pci_device="0000:00:1f.3"        #PCI <domain>:<bus number>:<device number>.function_number of Intel Audio device function
+
+
+
+############################################################
+# Main program                                             #
+############################################################
+
+#parse and check command line options
+VALID_ARGS=$(getopt -o "acDef:hstTu" -l "control,autosuspend_delay_ms,sys_interface_dir,runtime_enabled,gpu:,help,runtime_status,suspended_time,active_time,runtime_usage" -- "$@")
+if [[ $? -ne 0 ]]; then #checks exit status of last command; if it failed, exit the script
+    #exit 1;
+    invalid_command_handler
+fi
+# echo "$VALID_ARGS" #for debugging purposes
+eval set -- "$VALID_ARGS" #assign valid arg values to positional parameters. Position of the value referenced as ${N} 
+#echo $@ #for debugging purposes
+
+case $1 in
+    -h | --help) # display custom Help function
+        echo "$help"
+        exit 0;;
+esac
+
+# #set the device pci device that is being queried
+if [[ ${@: -1} == "nvidia" ]]; then # ${@: -1} gets the last command line argument
+    if [[ ($1 == '-f')  && ($2 == vga) ]]; then 
+        #device_function=$2; 
+        shift 2; #shift by two spaces
+        #vga_controller_pci_device=$nvidia_vga_controller_pci_device
+        pci_device=$nvidia_vga_controller_pci_device
+    elif [[ ($1 == '-f') && ($2 == audio) ]]; then
+        #device_function=$2; 
+        shift 2; #shift by two spaces
+        # audio_device_pci_device=$nvidia_audio_device_pci_device
+        pci_device=$nvidia_audio_device_pci_device
+    else 
+        invalid_command_handler
+    fi
+elif [[ ${@: -1} == "intel" ]]; then
+    if [[ ($1 == '-f') && ($2 == vga) ]]; then 
+        #device_function=$2;
+        shift 2; #shift by two spaces
+        # vga_controller_pci_device=$intel_vga_controller_pci_device
+        pci_device=$intel_vga_controller_pci_device
+    elif [[ ($1 == '-f') &&  ($2 == audio) ]]; then
+        #device_function=$2;
+        shift 2; #shift by two spaces
+        # audio_device_pci_device=$intel_audio_device_pci_device
+        pci_device=$intel_audio_device_pci_device
+    else 
+        invalid_command_handler
+    fi
+else
+    invalid_command_handler
+fi
+
+# echo "test $1" # for debugging purposes
+
+pci_dev_sys_interface_dir="${sys_interface_dir}/${pci_device}" #sys interface directory that contains the files for that contain the information of runtime Dynamic Power Management for the PCI function
+pci_dev_sys_interface_power_dir="${pci_dev_sys_interface_dir}/${rdpm_dir}"
+
+# echo "$pci_dev_sys_interface_power_dir" #for debugging purposes
+
+# Process the input options. Add options as needed.
+while [ : ]; do
+    # echo "$@" # for debugging purposes
+    case "$1" in
+        -a | all)
+            
+            ;;
+        -c | --control)
+            # $(cat /sys/bus/pci/devices/0000\:01\:00.0/power/control)
+            echo " $(cat ${pci_dev_sys_interface_power_dir}/control)"
+            ;;
+        # -d | --autosuspend_delay_ms) #this option results in 'Input/output error'
+        #     # $(cat /sys/bus/pci/devices/0000\:01\:00.0/power/autosuspend_delay_ms)
+        #     echo "$(cat ${pci_dev_sys_interface_power_dir}/autosuspend_delay_ms)"
+        #     ;;
+        -D | --pci_dev_sys_interface_dir)
+            echo "${pci_dev_sys_interface_dir}/"
+            ;;
+        -e | --runtime_enabled)
+            #$(cat /sys/bus/pci/devices/0000\:01\:00.0/power/runtime_enabled)
+            echo "$(cat ${pci_dev_sys_interface_power_dir}/runtime_enabled)"
+            ;;
+        -s | --runtime_status)
+            # $(cat /sys/bus/pci/devices/0000\:01\:00.0/power/runtime_status)
+            echo "$(cat ${pci_dev_sys_interface_power_dir}/runtime_status)"
+            ;;
+        -t | --runtime_suspended_time)
+            # $(cat /sys/bus/pci/devices/0000\:01\:00.0/power/runtime_suspended_time)
+            echo "$(cat ${pci_dev_sys_interface_power_dir}/runtime_suspended_time)"
+            ;;
+        -T | --runtime_active_time)
+            # $(cat /sys/bus/pci/devices/0000\:01\:00.0/power/runtime_active_time)
+            echo "$(cat ${pci_dev_sys_interface_power_dir}/runtime_active_time)"
+            ;;
+        -u | --runtime_usage)
+            # $(cat /sys/bus/pci/devices/0000\:01\:00.0/power/runtime_usage)
+            echo "$(cat ${pci_dev_sys_interface_power_dir}/runtime_usage)"
+            ;;
+        --) #no more arguments to match case with
+            shift
+            # echo "before break $@"
+            break
+            ;;
+        *) 
+            shift
+            ;;
+    esac
+    shift
+done
+
+# cat /sys/bus/pci/devices/0000\:01\:00.0/power/runtime_status
+# cat /sys/bus/pci/devices/0000\:01\:00.0/power/control
+# cat /sys/bus/pci/devices/0000\:01\:00.0/power/runtime_enabled
+# cat /sys/bus/pci/devices/0000\:01\:00.0/power/runtime_active_time
+# cat /sys/bus/pci/devices/0000\:01\:00.0/power/runtime_suspended_time
+# cat /sys/bus/pci/devices/0000\:01\:00.0/power/autosuspend_delay_ms
+# cat /proc/driver/nvidia/gpus/0000\:01\:00.0/information
+# cat /proc/driver/nvidia/gpus/0000\:01\:00.0/power
+# cat /proc/driver/nvidia/gpus/0000\:01\:00.0/registry
