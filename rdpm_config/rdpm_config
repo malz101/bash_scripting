@@ -94,7 +94,7 @@ pci_dev_sys_interface_dir="${sys_interface_dir}/${pci_device}" #sys interface di
 pci_dev_sys_interface_power_dir="${pci_dev_sys_interface_dir}/${rdpm_dir}"
 
 # test if devices exist,i.e., if it is currently loaded
-if [ ! -d pci_dev_sys_interface_power_dir ]; then 
+if [ ! -d $pci_dev_sys_interface_power_dir ]; then 
     echo "$(cat << EOM
 Device does not exist or it is not currently loaded on the pci bus.
 Ensure there are not any settings/rules that are disabling the device and proceed with the step below.
@@ -150,13 +150,13 @@ done
 
 
 #display to console
-if [[ ! -z "$control" ]]; then; echo -e "control\t\t\t$control";fi
+if [[ ! -z "$control" ]]; then echo -e "control\t\t\t$control"; fi
 
-if [[ ! -z "$dir" ]]; then; echo -e "interface_dir\t\t$dir"; fi
+if [[ ! -z "$dir" ]]; then echo -e "interface_dir\t\t$dir"; fi
 
-if [[ ! -z "$runtime_enabled" ]]; then; echo -e "runtime_enabled\t\t$runtime_enabled"; fi
+if [[ ! -z "$runtime_enabled" ]]; then echo -e "runtime_enabled\t\t$runtime_enabled"; fi
 
-if [[ ! -z "$runtime_status" ]]; then; echo -e "runtime_status\t\t$runtime_status"; fi
+if [[ ! -z "$runtime_status" ]]; then echo -e "runtime_status\t\t$runtime_status"; fi
 
 if [[ ! -z "$runtime_suspended_time" ]]; then
     runtime_suspended_time="$((runtime_suspended_time/1000))" #convert time from seconds to ms, this does not do value rounding
@@ -170,7 +170,7 @@ if [[ ! -z "$runtime_active_time" ]]; then
     echo -e "device_active_time\t$runtime_active_time_formatted"
 fi
 
-if [[ ! -z "$runtime_usage" ]]; then; echo -e "power_usage\t\t${runtime_usage}W";fi
+if [[ ! -z "$runtime_usage" ]]; then echo -e "power_usage\t\t${runtime_usage}W";fi
 
 
 # cat /proc/driver/nvidia/gpus/0000\:01\:00.0/information
