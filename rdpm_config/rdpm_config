@@ -1,7 +1,17 @@
 #!/bin/bash
-############################################################
-# Help                                                     #
-############################################################
+##########################################################
+#Function Definitions                                    #
+##########################################################
+invalid_command_handler(){
+    echo -e "rdpm_config: invalid command.\nTry 'rdpm_config --help' for more information."
+    #echo "$help"       #quotation is needed, otherwise it removes all of the trailing newlines
+    exit 1
+}
+
+
+##########################################################
+#Variable Definitions                                    #
+##########################################################
 help=$(cat << EOM
 Runtime Dynamic Power Management information for NVIDIA Optimus laptops.
     
@@ -31,15 +41,6 @@ EOM
 )
 # -d, --autosuspend_delay_ms       displays the minimum time period of inactivity between idle state and suspending for the PCI function
 
-invalid_command_handler(){
-    echo -e "rdpm_config: invalid command.\nTry 'rdpm_config --help' for more information."
-    #echo "$help"       #quotation is needed, otherwise it removes all of the trailing newlines
-    exit 1
-}
-
-##########################################################
-#Variable Definitions                                    #
-##########################################################
 #/sys/bus/pci/devices/<Domain>:<Bus>:<Device>.<Function>/
 #the bus,device and function for device can be gathered from the lspci linux command. PCI devices are also given domain numbers, but they are usually omitted by lspci since very often all devices have the same domain number (usually zero)
 sys_interface_dir="/sys/bus/pci/devices" #sys interface directory that contains the files for that contain the information of all PCI devices connected to computer
@@ -54,13 +55,14 @@ intel_audio_device_pci_device="0000:00:1f.3"        #PCI <domain>:<bus number>:<
 ############################################################
 # Main program                                             #
 ############################################################
+set -e      # If a command in a Bash script exits with a non-zero status code, the entire script will stop.
 
 #parse and check command line options
-VALID_ARGS=$(getopt -o "acDef:hstTu" -l "control,autosuspend_delay_ms,sys_interface_dir,runtime_enabled,gpu:,help,runtime_status,suspended_time,active_time,runtime_usage" -- "$@")
-if [[ $? -ne 0 ]]; then #checks exit status of last command; if it failed, exit the script
-    #exit 1;
-    invalid_command_handler
-fi
+VALID_ARGS=$(getopt -o "acDef:hstTu" -l "all,control,pci_dev_sys_interface_dir,runtime_enabled,help,runtime_status,suspended_time,active_time,runtime_usage" -- "$@")
+# if [[ $? -ne 0 ]]; then #checks exit status of last command; if it failed, exit the script
+#     #exit 1;
+#     invalid_command_handler
+# fi
 # echo "$VALID_ARGS" #for debugging purposes
 eval set -- "$VALID_ARGS" #assign valid arg values to positional parameters. Position of the value referenced as ${N} 
 #echo $@ #for debugging purposes
@@ -73,7 +75,7 @@ esac
 
 # #set the device pci device that is being queried
 if [[ ${@: -1} == "nvidia" ]]; then # ${@: -1} gets the last command line argument
-    if [[ ($1 == '-f')  && ($2 == vga) ]]; then 
+    if [[ ($1 == '-f') && ($2 == vga) ]]; then 
         #device_function=$2; 
         shift 2; #shift by two spaces
         #vga_controller_pci_device=$nvidia_vga_controller_pci_device
@@ -109,6 +111,18 @@ fi
 pci_dev_sys_interface_dir="${sys_interface_dir}/${pci_device}" #sys interface directory that contains the files for that contain the information of runtime Dynamic Power Management for the PCI function
 pci_dev_sys_interface_power_dir="${pci_dev_sys_interface_dir}/${rdpm_dir}"
 
+# test if devices exist,i.e., if it is currently loaded
+if [ ! -d pci_dev_sys_interface_power_dir ]; then 
+    echo "$(cat << EOM
+Device does not exist or it is not currently loaded on the pci bus.
+Ensure there are not any settings/rules that are disabling the device and proceed with the step below.
+Please do a rescan of the pci bus with the following command 'echo 1 > /sys/bus/pci/rescan' and try again.
+
+EOM
+)"
+exit 0
+fi
+
 # echo "$pci_dev_sys_interface_power_dir" #for debugging purposes
 
 # Process the input options. Add options as needed.
@@ -116,38 +130,37 @@ while [ : ]; do
     # echo "$@" # for debugging purposes
     case "$1" in
         -a | all)
-            
+            #reset command line args to include all arguments
+            ARGS=$(getopt -o "cDestTu" -- "-cDestTu")
+            eval set -- "$ARGS"
+            continue
             ;;
         -c | --control)
             # $(cat /sys/bus/pci/devices/0000\:01\:00.0/power/control)
-            echo " $(cat ${pci_dev_sys_interface_power_dir}/control)"
+            control="$(cat ${pci_dev_sys_interface_power_dir}/control)"
             ;;
-        # -d | --autosuspend_delay_ms) #this option results in 'Input/output error'
-        #     # $(cat /sys/bus/pci/devices/0000\:01\:00.0/power/autosuspend_delay_ms)
-        #     echo "$(cat ${pci_dev_sys_interface_power_dir}/autosuspend_delay_ms)"
-        #     ;;
         -D | --pci_dev_sys_interface_dir)
-            echo "${pci_dev_sys_interface_dir}/"
+            dir="${pci_dev_sys_interface_dir}/"
             ;;
         -e | --runtime_enabled)
             #$(cat /sys/bus/pci/devices/0000\:01\:00.0/power/runtime_enabled)
-            echo "$(cat ${pci_dev_sys_interface_power_dir}/runtime_enabled)"
+            runtime_enabled="$(cat ${pci_dev_sys_interface_power_dir}/runtime_enabled)"
             ;;
         -s | --runtime_status)
             # $(cat /sys/bus/pci/devices/0000\:01\:00.0/power/runtime_status)
-            echo "$(cat ${pci_dev_sys_interface_power_dir}/runtime_status)"
+            runtime_status="$(cat ${pci_dev_sys_interface_power_dir}/runtime_status)"
             ;;
         -t | --runtime_suspended_time)
             # $(cat /sys/bus/pci/devices/0000\:01\:00.0/power/runtime_suspended_time)
-            echo "$(cat ${pci_dev_sys_interface_power_dir}/runtime_suspended_time)"
+            runtime_suspended_time="$(cat ${pci_dev_sys_interface_power_dir}/runtime_suspended_time)"
             ;;
         -T | --runtime_active_time)
             # $(cat /sys/bus/pci/devices/0000\:01\:00.0/power/runtime_active_time)
-            echo "$(cat ${pci_dev_sys_interface_power_dir}/runtime_active_time)"
+            runtime_active_time="$(cat ${pci_dev_sys_interface_power_dir}/runtime_active_time)"
             ;;
         -u | --runtime_usage)
             # $(cat /sys/bus/pci/devices/0000\:01\:00.0/power/runtime_usage)
-            echo "$(cat ${pci_dev_sys_interface_power_dir}/runtime_usage)"
+            runtime_usage="$(cat ${pci_dev_sys_interface_power_dir}/runtime_usage)"
             ;;
         --) #no more arguments to match case with
             shift
@@ -161,12 +174,30 @@ while [ : ]; do
     shift
 done
 
-# cat /sys/bus/pci/devices/0000\:01\:00.0/power/runtime_status
-# cat /sys/bus/pci/devices/0000\:01\:00.0/power/control
-# cat /sys/bus/pci/devices/0000\:01\:00.0/power/runtime_enabled
-# cat /sys/bus/pci/devices/0000\:01\:00.0/power/runtime_active_time
-# cat /sys/bus/pci/devices/0000\:01\:00.0/power/runtime_suspended_time
-# cat /sys/bus/pci/devices/0000\:01\:00.0/power/autosuspend_delay_ms
+
+#display to console
+if [[ ! -z "$control" ]]; then; echo -e "control\t\t\t$control";fi
+
+if [[ ! -z "$dir" ]]; then; echo -e "interface_dir\t\t$dir"; fi
+
+if [[ ! -z "$runtime_enabled" ]]; then; echo -e "runtime_enabled\t\t$runtime_enabled"; fi
+
+if [[ ! -z "$runtime_status" ]]; then; echo -e "runtime_status\t\t$runtime_status"; fi
+
+if [[ ! -z "$runtime_suspended_time" ]]; then
+    # echo -e "runtime_suspended_time\t$runtime_suspended_time"
+    runtime_suspended_time="$((runtime_suspended_time/1000))" #convert time from seconds to ms, this does not do value rounding
+    printf -v runtime_suspended_time_formatted '%02dh:%02dm:%02ds' $((runtime_suspended_time/3600)) $((runtime_suspended_time%3600/60)) $((runtime_suspended_time%60))
+    echo -e "device_suspended_time\t$runtime_suspended_time_formatted"
+fi
+
+if [[ ! -z "$runtime_active_time" ]]; then
+    runtime_active_time=$((runtime_active_time/1000)) #convert time from seconds to ms, this does not do value rounding
+    printf -v runtime_active_time_formatted '%02dh:%02dm:%02ds' $((runtime_active_time/3600)) $((runtime_active_time%3600/60)) $((runtime_active_time%60))
+    echo -e "device_active_time\t$runtime_active_time_formatted"
+fi
+
+if [[ ! -z "$runtime_usage" ]]; then; echo -e "power_usage\t\t${runtime_usage}W";fi
 # cat /proc/driver/nvidia/gpus/0000\:01\:00.0/information
 # cat /proc/driver/nvidia/gpus/0000\:01\:00.0/power
 # cat /proc/driver/nvidia/gpus/0000\:01\:00.0/registry
