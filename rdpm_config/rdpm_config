@@ -44,7 +44,7 @@ EOM
 sys_interface_dir="/sys/bus/pci/devices" #sys interface directory that contains the files for that contain the information of all PCI devices connected to computer
 rdpm_dir="power"
 nvidia_vga_controller_pci_device="0000:01:00.0"     #PCI <domain>:<bus number>:<device number>.function_number of NVIDIA VGA Controller function
-nvidia_audio_device_pci_device="0000:01:00.2"       #PCI <domain>:<bus number>:<device number>.function_number of NVIDIA Audio device function
+nvidia_audio_device_pci_device="0000:01:00.1"       #PCI <domain>:<bus number>:<device number>.function_number of NVIDIA Audio device function
 intel_vga_controller_pci_device="0000:00:02.0"      #PCI <domain>:<bus number>:<device number>.function_number of Intel VGA Controller function
 intel_audio_device_pci_device="0000:00:1f.3"        #PCI <domain>:<bus number>:<device number>.function_number of Intel Audio device function
 
