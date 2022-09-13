@@ -1,0 +1,252 @@
+#!/bin/bash
+##########################################################
+#Variable Definitions                                    #
+##########################################################
+nvidia_vga_controller_pci_device="0000:01:00.0"     #PCI <domain>:<bus number>:<device number>.function_number of NVIDIA VGA Controller device
+nvidia_audio_device_pci_device="0000:01:00.1"       #PCI <domain>:<bus number>:<device number>.function_number of NVIDIA Audio device device
+intel_vga_controller_pci_device="0000:00:02.0"      #PCI <domain>:<bus number>:<device number>.function_number of Intel VGA Controller device
+intel_audio_device_pci_device="0000:00:1f.3"        #PCI <domain>:<bus number>:<device number>.function_number of Intel Audio device device
+
+sys_interface_dir="/sys/bus/pci/devices" #sys interface directory that contains the files for that contain the information of all PCI devices connected to computer
+rdpm_dir="power"
+
+help=$(cat << EOM
+Runtime Dynamic Power Management (RDPM) information for NVIDIA Optimus laptops.
+    
+Usage: 
+    rdpm --info --function vga|audio  [OPTION]... intel|nvidia
+        -a, --all                        displays all information for the PCI device
+        -c, --control                    displays the contents of the control file for RDPM for the PCI device
+        -d, --autosuspend_delay_ms       displays the auto-suspend delay for PCI device
+        -D, --pci_dev_sys_interface_dir  displays the sys interface directory that contains the files for that contain the information of RDPM for the PCI device
+        -e, --runtime_enabled            displays status of the RDPM (enabled, disabled or forbidden) for the PCI device
+        -s, --runtime_status             displays the current status (active or suspended) of the PCI device
+        -t, --suspended_time             displays the cumulative length of time that the PCI device has been suspended since last boot (hh:mm:ss)
+        -T, --active_time                displays the cumulative length of time that the PCI device has been active since last boot (hh:mm:ss)
+        -u, --runtime_usage              displays the the runtime PM usage count of the PCI device
+    
+    rdpm --config --function vga|audio  [OPTION]... intel|nvidia
+        -c, --control auto|on             enable or disable RDPM for a particular device
+        -d, --autosuspend_delay_ms <int>  controls the auto-suspend delay
+
+    rdpm -h | --help              display this help and exit
+
+Examples:
+    rdpm  --info --function vga -s nvidia  Output the cumulative length of time the VGA controller PCI function of the nvidia gpu has been suspended since last boot.
+    rdpm  --info --function audio -se intel Output the cumulative length of time the intel Audio device has been suspended since last boot and status of Dynamic Power Management.
+
+Additional Help:
+    sysfs-devices-power: <https://www.kernel.org/doc/Documentation/ABI/testing/sysfs-devices-power>
+    Documentation/power/runtime_pm.txt: <https://lwn.net/Articles/347575/>
+    RedHat Runtime Device Power Management: <https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/7/html/power_management_guide/runtime_device_power_management>
+    NVIDIA PCI-Express Runtime D3 (RTD3) Power Management: <https://download.nvidia.com/XFree86/Linux-x86_64/515.65.01/README/dynamicpowermanagement.html>
+    Full documentation: <https://www.kernel.org/doc/html/latest/power/runtime_pm.html>
+EOM
+)
+
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+
+##########################################################
+#Function Definitions                                    #
+##########################################################
+invalid_command_handler(){
+    echo -e "rdpm: invalid command.\n$1\nTry 'rdpm --help' for more information." >&2
+    exit 1
+}
+
+info(){
+    
+    local pci_dev_sys_interface_dir=$1
+    local pci_dev_sys_interface_power_dir=$2
+    shift 2 #shift by two spaces
+    
+    #parse and check command line options
+    VALID_ARGS=$(getopt -o "acdDe:stTu" -l "all,control,autosuspend_delay_ms,pci_dev_sys_interface_dir,runtime_enabled,help,runtime_status,suspended_time,active_time,runtime_usage" -- "$@")
+    [[ $? -ne 0 ]] && exit 1
+
+    eval set -- "$VALID_ARGS" #assign valid arg values to positional parameters. Position of the value referenced as ${N} 
+
+    # Process the input options. Add options as needed.
+    while [ : ]; do
+        # echo "$@" # for debugging purposes
+        case "$1" in
+            -a | all)
+                #reset command line args to include all arguments
+                local ARGS=$(getopt -o "cdDestTu" -- "-cdDestTu")
+                eval set -- "$ARGS"
+                continue
+                ;;
+            -c | --control)
+                control="$(cat ${pci_dev_sys_interface_power_dir}/control)"
+                ;;
+            -d | --autosuspend_delay_ms)
+                autosuspend_delay_ms="$(cat ${pci_dev_sys_interface_power_dir}/autosuspend_delay_ms 2> /dev/null)" 
+                [[ $? -ne 0 ]] && autosuspend_delay_ms="not supported by driver"
+                ;;
+            -D | --pci_dev_sys_interface_dir)
+                dir="${pci_dev_sys_interface_dir}/"
+                ;;
+            -e | --runtime_enabled)
+                runtime_enabled="$(cat ${pci_dev_sys_interface_power_dir}/runtime_enabled)"
+                ;;
+            -s | --runtime_status)
+                runtime_status="$(cat ${pci_dev_sys_interface_power_dir}/runtime_status)"
+                ;;
+            -t | --runtime_suspended_time)
+                runtime_suspended_time="$(cat ${pci_dev_sys_interface_power_dir}/runtime_suspended_time)"
+                ;;
+            -T | --runtime_active_time)
+                runtime_active_time="$(cat ${pci_dev_sys_interface_power_dir}/runtime_active_time)"
+                ;;
+            -u | --runtime_usage)
+                runtime_usage="$(cat ${pci_dev_sys_interface_power_dir}/runtime_usage)"
+                ;;
+            --) #no more arguments to match case with
+                shift
+                break
+                ;;
+        esac
+        shift
+    done
+
+    #display to console
+    [[ ! -z "$control" ]] && echo -e "control\t\t\t$control"
+    [[ ! -z "$autosuspend_delay_ms" ]] && echo -e "autosuspend_delay_ms\t${RED}$autosuspend_delay_ms${NC}"
+    [[ ! -z "$dir" ]] && echo -e "interface_dir\t\t$dir"
+    [[ ! -z "$runtime_enabled" ]] && echo -e "runtime_enabled\t\t$runtime_enabled"
+    [[ ! -z "$runtime_status" ]] && echo -e "runtime_status\t\t$runtime_status"
+    if [[ ! -z "$runtime_suspended_time" ]]; then
+        runtime_suspended_time="$((runtime_suspended_time/1000))" #convert time from seconds to ms, this does not do value rounding
+        printf -v runtime_suspended_time_formatted '%02dh:%02dm:%02ds' $((runtime_suspended_time/3600)) $((runtime_suspended_time%3600/60)) $((runtime_suspended_time%60))
+        echo -e "device_suspended_time\t$runtime_suspended_time_formatted"
+    fi
+    if [[ ! -z "$runtime_active_time" ]]; then
+        runtime_active_time=$((runtime_active_time/1000)) #convert time from seconds to ms, this does not do value rounding
+        printf -v runtime_active_time_formatted '%02dh:%02dm:%02ds' $((runtime_active_time/3600)) $((runtime_active_time%3600/60)) $((runtime_active_time%60))
+        echo -e "device_active_time\t$runtime_active_time_formatted"
+    fi
+    [[ ! -z "$runtime_usage" ]] && echo -e "runtime_usage\t\t${runtime_usage}"
+
+}
+
+config(){
+    local pci_dev_sys_interface_power_dir=$1
+    shift 1 #shift by two spaces
+    
+    #parse and check command line options
+    VALID_ARGS=$(getopt -o "c:d:" -l "control,autosuspend_delay_ms" -- "$@")
+    [[ $? -ne 0 ]] && exit 1
+
+    eval set -- "$VALID_ARGS" #assign valid arg values to positional parameters. Position of the value referenced as ${N} 
+
+    # Process the input options. Add options as needed.
+    while [ : ]; do
+        # echo "$@" # for debugging purposes
+        case "$1" in
+            -c | --control)
+                [[ ($2 != "auto") && ($2 != "on") ]] && invalid_command_handler "Invalid argument used with the -c | --control flag."
+                #control="$(cat ${pci_dev_sys_interface_power_dir}/control)"
+                control=$2
+                #echo $2 > "${pci_dev_sys_interface_power_dir}/control"
+                ;;
+            -d | --autosuspend_delay_ms)
+                re='^[0-9]+$' #have to declare this variable for the test below to work
+                [[ $2 =~ $re ]] || invalid_command_handler "Non integer argument passed to -d | --autosuspend_delay_ms flag."
+                autosuspend_delay_ms=$2
+                #echo $2 > "${pci_dev_sys_interface_power_dir}/autosuspend_delay_ms"
+                ;;
+            --) #no more arguments to match case with
+                shift
+                break
+                ;;
+        esac
+        shift 2
+    done
+
+    # execute commands
+    if [[ ! -z "$control" ]]; then
+        echo $control > "${pci_dev_sys_interface_power_dir}/control"
+    fi 
+
+    if [[ ! -z "$autosuspend_delay_ms" ]]; then
+        #test if configuring autosuspend_delay_ms is supported by driver
+        autosuspend_delay_ms="$(cat ${pci_dev_sys_interface_power_dir}/autosuspend_delay_ms 2> /dev/null)"  
+        if [[ $? -ne 0 ]]; then 
+            echo -e "${RED}configuring autosuspend_delay_ms not supported by driver${NC}"
+        else
+            echo $autosuspend_delay_ms > "${pci_dev_sys_interface_power_dir}/autosuspend_delay_ms"   
+        fi
+    fi
+}
+
+
+
+############################################################
+# Main program                                             #
+############################################################
+# set -e      # If a command in a Bash script exits with a non-zero status code, the entire script will stop.
+
+[[ -z $1 ]] && invalid_command_handler "No arguments specified."
+
+case $1 in
+    -h | --help) # display custom Help function
+        echo "$help"
+        exit 0;;
+esac
+
+#check validity of query type
+if [[ $1 == "--info" ]]; then
+   query_type="info"
+elif [[ $1 == "--config" ]]; then
+    query_type="config"
+    groups=$(groups)
+    if [[ "$groups" != *"root"* ]]; then
+        echo -e "${RED}please run command as a user with root priviledges${NC}"
+        exit 1
+    fi
+else
+    invalid_command_handler "Invalid query type '$1' specified"
+fi
+shift 1
+
+# set the device pci device that is being queried
+if [[ ${@: -1} == "nvidia" ]]; then # ${@: -1} gets the last command line argument
+    if [[ ($1 == '--function') && ($2 == "vga") ]]; then 
+        pci_device=$nvidia_vga_controller_pci_device
+    elif [[ ($1 == '--function') && ($2 == "audio") ]]; then
+        pci_device=$nvidia_audio_device_pci_device
+    else 
+        invalid_command_handler "Invalid argument passed to the --function flag."
+    fi
+elif [[ ${@: -1} == "intel" ]]; then
+    if [[ ($1 == '--function') && ($2 == "vga") ]]; then 
+        pci_device=$intel_vga_controller_pci_device
+    elif [[ ($1 == '--function') &&  ($2 == "audio") ]]; then
+        pci_device=$intel_audio_device_pci_device
+    else 
+        invalid_command_handler "Invalid argument passed to the --function flag."
+    fi
+else
+    invalid_command_handler "Invalid vendor '' specified."
+fi
+shift 2
+
+pci_dev_sys_interface_dir="${sys_interface_dir}/${pci_device}" #sys interface directory that contains the files for that contain the information of runtime Dynamic Power Management for the PCI function
+pci_dev_sys_interface_power_dir="${pci_dev_sys_interface_dir}/${rdpm_dir}"
+
+# test if devices exist,i.e., if it is currently loaded
+if [ ! -d $pci_dev_sys_interface_power_dir ]; then 
+    echo "$(cat << EOM
+Device does not exist or it is not currently loaded on the pci bus.
+Ensure there are not any settings/rules that are disabling the device and proceed with the step below.
+Please do a rescan of the pci bus with the following command 'sudo echo 1 > /sys/bus/pci/rescan' and try again.
+
+EOM
+)"
+exit 0
+fi
+
+
+[[ $query_type == "info" ]] && info $pci_dev_sys_interface_dir $pci_dev_sys_interface_power_dir $@
+[[ $query_type == "config" ]] && config $pci_dev_sys_interface_power_dir $@
