@@ -201,10 +201,7 @@ if [[ $1 == "--info" ]]; then
 elif [[ $1 == "--config" ]]; then
     query_type="config"
     groups=$(groups)
-    if [[ "$groups" != *"root"* ]]; then
-        echo -e "${RED}please run command as a user with root priviledges${NC}"
-        exit 1
-    fi
+    if [[ "$groups" != *"root"* ]]; && echo -e "${RED}please run command as a user with root priviledges${NC}"
 else
     invalid_command_handler "Invalid query type '$1' specified"
 fi
