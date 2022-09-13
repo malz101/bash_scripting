@@ -2,10 +2,10 @@
 ##########################################################
 #Variable Definitions                                    #
 ##########################################################
-nvidia_vga_controller_pci_device="0000:01:00.0"     #PCI <domain>:<bus number>:<device number>.function_number of NVIDIA VGA Controller device
-nvidia_audio_device_pci_device="0000:01:00.1"       #PCI <domain>:<bus number>:<device number>.function_number of NVIDIA Audio device device
-intel_vga_controller_pci_device="0000:00:02.0"      #PCI <domain>:<bus number>:<device number>.function_number of Intel VGA Controller device
-intel_audio_device_pci_device="0000:00:1f.3"        #PCI <domain>:<bus number>:<device number>.function_number of Intel Audio device device
+nvidia_vga_controller_pci_device="<domain>:<bus number>:<device number>.function_number"     #NVIDIA VGA Controller device
+nvidia_audio_device_pci_device="<domain>:<bus number>:<device number>.function_number"       #NVIDIA Audio device
+intel_vga_controller_pci_device="<domain>:<bus number>:<device number>.function_number"      #Intel VGA Controller device
+intel_audio_device_pci_device="<domain>:<bus number>:<device number>.function_number"        #Intel Audio device device
 
 sys_interface_dir="/sys/bus/pci/devices" #sys interface directory that contains the files for that contain the information of all PCI devices connected to computer
 rdpm_dir="power"
