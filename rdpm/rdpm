@@ -62,7 +62,7 @@ info(){
     shift 2 #shift by two spaces
     
     #parse and check command line options
-    VALID_ARGS=$(getopt -o "acdDe:stTu" -l "all,control,autosuspend_delay_ms,pci_dev_sys_interface_dir,runtime_enabled,help,runtime_status,suspended_time,active_time,runtime_usage" -- "$@")
+    VALID_ARGS=$(getopt -o "acdDestTu" -l "all,control,autosuspend_delay_ms,pci_dev_sys_interface_dir,runtime_enabled,help,runtime_status,suspended_time,active_time,runtime_usage" -- "$@")
     [[ $? -ne 0 ]] && exit 1
 
     eval set -- "$VALID_ARGS" #assign valid arg values to positional parameters. Position of the value referenced as ${N} 
@@ -71,7 +71,7 @@ info(){
     while [ : ]; do
         # echo "$@" # for debugging purposes
         case "$1" in
-            -a | all)
+            -a | --all)
                 #reset command line args to include all arguments
                 local ARGS=$(getopt -o "cdDestTu" -- "-cdDestTu")
                 eval set -- "$ARGS"
@@ -135,7 +135,7 @@ config(){
     shift 1 #shift by two spaces
     
     #parse and check command line options
-    VALID_ARGS=$(getopt -o "c:d:" -l "control,autosuspend_delay_ms" -- "$@")
+    VALID_ARGS=$(getopt -o "c:d:" -l "control:,autosuspend_delay_ms:" -- "$@")
     [[ $? -ne 0 ]] && exit 1
 
     eval set -- "$VALID_ARGS" #assign valid arg values to positional parameters. Position of the value referenced as ${N} 
@@ -228,7 +228,7 @@ elif [[ ${@: -1} == "intel" ]]; then
         invalid_command_handler "Invalid argument passed to the --function flag."
     fi
 else
-    invalid_command_handler "Invalid vendor '' specified."
+    invalid_command_handler "Invalid vendor specified."
 fi
 shift 2
 
