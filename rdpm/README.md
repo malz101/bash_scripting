@@ -8,7 +8,7 @@ IMPORTANT: Please make sure you have the NVIDIA proprietary drivers installed.
 
 Download "rdpm_config" and place in "/usr/local/bin/" directory, to make the executable accessible as a command system wide.
 ```console
-sudo wget -O /usr/local/bin/rdpm_config https://raw.githubusercontent.com/malz101/bash_scripting/main/rdpm/rdpm && sudo chmod 755 /usr/local/bin/rdpm
+sudo wget -O /usr/local/bin/rdpm https://raw.githubusercontent.com/malz101/bash_scripting/main/rdpm/rdpm && sudo chmod 755 /usr/local/bin/rdpm
 ```
 
 Download "90-nvidia-udev-pm-G05.rules" and place in the "/etc/udev/rules.d/" directory, to automatically setup NVIDIA GPU for runtime power management, at boot.
