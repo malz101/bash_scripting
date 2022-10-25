@@ -1,0 +1,4 @@
+#!/bin/bash
+#flatpak run com.usebottles.bottles > /dev/null 2>&1 & #run in background and send all output to null device
+flatpak run --branch=stable --arch=x86_64 --command=bottles --file-forwarding com.usebottles.bottles
+#exit $? #return code of the last bash command
