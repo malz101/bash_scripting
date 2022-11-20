@@ -1,0 +1,13 @@
+#!/bin/bash
+groups=$(groups)
+error_message=$(cat << EOM
+Please run command as a user with superuser priviledges (eg. root).
+
+See grub2-mkconfig
+EOM
+)
+if [[ "$groups" != *"root"* ]]; then 
+    echo -e "$error_message">&2 #redirect output to stderr
+    exit 1
+fi
+grub2-mkconfig -o /boot/grub2/grub.cfg
